@@ -12,12 +12,11 @@ add_executable(cgim
 ../src/cg_app.c
 )
 
-set(CMAKE_C_FLAGS "-std=c89")
+set(CMAKE_C_FLAGS "-std=c89 -pedantic -Werror")
 
 target_link_libraries(cgim glfw)
 target_link_libraries(cgim ${GLEW_LIBRARIES})
 target_link_libraries(cgim ${LIBTIFF_LIBRARIES})
-target_link_libraries(cgim ${TCLAP_LIBRARIES})
 target_link_libraries(cgim ${X11_LIBRARIES})
 target_link_libraries(cgim ${Xxf86vm_LIBRARIES})
 target_link_libraries(cgim libpthread.so)

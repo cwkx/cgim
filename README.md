@@ -16,6 +16,5 @@ an experimental framework for computer graphics, image processing, machine learn
 
 ### compile instructions
 - recommended to use atom or vim
-- run the following from the build directory
-- ````clang ../src/cg_app.c -std=c89 `pkg-config --cflags --libs --static glfw3 glew x11 xxf86vm` -o cgim && ./cgim````
-- alternatively use CMakeLists.txt
+- run the following from the build directory, or use cmake . && make && ./cgim
+- ````clang ../src/cg_app.c -std=c89 -pedantic -Werror `pkg-config --cflags --libs --static glfw3 glew x11 xxf86vm` -o cgim && ./cgim````

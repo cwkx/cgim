@@ -44,38 +44,49 @@ static void errorCallback(int e, const char* d)
 
 int glfwSetWindowCenter(GLFWwindow * window)
 {
-	if( !window )
-		return 0;
-
 	int sx = 0, sy = 0;
 	int px = 0, py = 0;
 	int mx = 0, my = 0;
 	int monitor_count = 0;
 	int best_area = 0;
 	int final_x = 0, final_y = 0;
+	int j;
+
+	GLFWmonitor ** m = NULL;
+
+	if(!window)
+		return 0;
 
 	glfwGetWindowSize( window , &sx, &sy );
 	glfwGetWindowPos( window , &px, &py );
 
-	GLFWmonitor ** m = glfwGetMonitors( &monitor_count );
+	m = glfwGetMonitors( &monitor_count );
+
 	if(!m)
 		return 0;
 
-	int j=0;
 	for (j=0; j<monitor_count; ++j)
 	{
+		const GLFWvidmode * mode = NULL;
+		int minX;
+		int minY;
+		int maxX;
+		int maxY;
+		int area;
+
 		glfwGetMonitorPos(m[j], &mx, &my);
-		const GLFWvidmode * mode = glfwGetVideoMode( m[j] );
+		mode = glfwGetVideoMode(m[j]);
+
 		if( !mode )
 			continue;
 
-		int minX = mx>px?mx:px;
-		int minY = my>py?my:py;
+		minX = mx>px?mx:px;
+		minY = my>py?my:py;
 
-		int maxX = mx+mode->width <px+sx?mx+mode->width :px+sx;
-		int maxY = my+mode->height<py+sy?my+mode->height:py+sy;
+		maxX = mx+mode->width <px+sx?mx+mode->width :px+sx;
+		maxY = my+mode->height<py+sy?my+mode->height:py+sy;
 
-		int area = (maxX-minX>0?maxX-minX:0)*(maxY-minY>0?maxY-minY:0);
+		area = (maxX-minX>0?maxX-minX:0)*(maxY-minY>0?maxY-minY:0);
 		if (area>best_area)
 		{
 			final_x = mx + (mode->width-sx)/2;
@@ -107,9 +118,12 @@ int glfwSetWindowCenter(GLFWwindow * window)
 int main()
 {
 	/* platform */
-	static GLFWwindow* win;
+	static GLFWwindow* win = NULL;
 	int width = 0, height = 0;
-	struct nk_context *ctx;
+	struct nk_context *ctx = NULL;
+	struct cg_image* im = NULL;
+	struct cg_image* dst = NULL;
+	struct nk_image tex;
 
 	/* glfw */
 	glfwSetErrorCallback(errorCallback);
@@ -147,13 +161,12 @@ int main()
 	}
 
 	/* image */
-	struct cg_image* im = cg_image_load("../data/lena2D.png");
-	struct nk_image tex = nk_image_id(cg_image_bind(im));
+	im = cg_image_load("../data/lena2D.png");
+	cg_image_rgb_to_gray(im);
+	dst = cg_image_clone(im, sizeof(float));
+	tex = nk_image_id(cg_image_bind_ubyte(im));
 	cg_image_free(im);
-
-	/* test */
-	struct cg_image* dst = malloc(sizeof(struct cg_image));
-	dst->data = malloc(sizeof(im->data));
+	/*cg_image_free(dst);*/
 
 	glfwShowWindow(win);
 	while (!glfwWindowShouldClose(win))
@@ -177,7 +190,6 @@ int main()
 			nk_end(ctx);
 		}
 
-		int width, height;
 		glfwGetWindowSize(win, &width, &height);
 		glViewport(0, 0, width, height);
 		glClear(GL_COLOR_BUFFER_BIT);

@@ -19,7 +19,7 @@ extern "C" {
 
 /* START OF API ==============================================================*/
 struct cg_image;
-CG_API unsigned int cg_image_bind(struct cg_image *im);
+CG_API unsigned int cg_image_bind_ubyte(struct cg_image *im);
 /* END OF API ================================================================*/
 
 #ifdef __cplusplus
@@ -30,7 +30,7 @@ CG_API unsigned int cg_image_bind(struct cg_image *im);
 #ifdef CG_IMAGE_IMPLEMENTATION
 
 /* IMPLEMENTATION ============================================================*/
-CG_API unsigned int cg_image_bind(struct cg_image *im)
+CG_API unsigned int cg_image_bind_ubyte(struct cg_image *im)
 {
 	GLuint tex;
 	glGenTextures(1, &tex);
@@ -39,7 +39,14 @@ CG_API unsigned int cg_image_bind(struct cg_image *im)
 	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, im->size[0], im->size[1], 0, GL_RGB, GL_UNSIGNED_BYTE, im->data);
+
+	if (im->comp == 3)
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, im->size[0], im->size[1], 0, GL_RGB, GL_UNSIGNED_BYTE, im->data);
+	else if (im->comp == 1)
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, im->size[0], im->size[1], 0, GL_RED, GL_UNSIGNED_BYTE, im->data);
+	else
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, im->size[0], im->size[1], 0, GL_RGBA, GL_UNSIGNED_BYTE, im->data);
+
 	return tex;
 }
 /* END OF IMPLEMENTATION =====================================================*/
