@@ -163,7 +163,7 @@ int main()
 	/* image */
 	im = cg_image_load("../data/lena2D.png");
 	cg_image_rgb_to_gray(im);
-	dst = cg_image_clone(im, sizeof(float));
+	dst = cg_image_clone(im);
 	tex = nk_image_id(cg_image_bind_ubyte(im));
 	cg_image_free(im);
 	/*cg_image_free(dst);*/
@@ -178,8 +178,7 @@ int main()
 		/* gui */
 		{
 			struct nk_panel layout;
-			if (nk_begin(ctx, &layout, "Image Window", nk_rect(50, 50, 230, 250),
-			             NK_WINDOW_BORDER|NK_WINDOW_SCALABLE|NK_WINDOW_TITLE))
+			if (nk_begin(ctx, &layout, "Image Window", nk_rect(50, 50, 230, 250), NK_WINDOW_BORDER|NK_WINDOW_SCALABLE|NK_WINDOW_TITLE))
 			{
 				nk_layout_row_dynamic(ctx, 25, 1);
 				nk_label(ctx, "hi", NK_TEXT_LEFT);
