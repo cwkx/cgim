@@ -163,8 +163,8 @@ int main()
 	/* image */
 	im = cg_image_load("../data/lena2D.png");
 	cg_image_rgb_to_gray(im);
-	dst = cg_image_clone(im);
-	tex = nk_image_id(cg_image_bind_ubyte(im));
+	/*dst = cg_image_clone(im); */
+	tex = nk_image_id(cg_image_bind(im));
 	cg_image_free(im);
 	/*cg_image_free(dst);*/
 

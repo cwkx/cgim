@@ -1,5 +1,6 @@
 /*==============================================================================
 	cg_image, single-header
+	multi-dimensional separate float and byte functions
    copyright chris g. willcocks MIT license
 ==============================================================================*/
 
@@ -18,14 +19,19 @@ extern "C" {
 
 /* START OF API ==============================================================*/
 struct cg_image;
+struct cg_imagef;
 
-CG_API struct cg_image* cg_image_load           (char const *filename);
-CG_API void             cg_image_free           (struct cg_image *im);
-CG_API void             cg_image_rgb_to_gray    (struct cg_image *im);
-CG_API struct cg_image* cg_image_clone          (struct cg_image *im);
-CG_API void             cg_image_to_ycbcr       (struct cg_image *im);
-CG_API void             cg_image_normalise      (struct cg_image *im);
-CG_API void             cg_image_blur_gauss_2d  (struct cg_image *im, float sigma, int n);
+CG_API struct cg_image*  cg_image_load           (char const *filename);
+CG_API void              cg_image_free           (struct cg_image *im);
+CG_API struct cg_image*  cg_image_clone          (struct cg_image *im);
+CG_API void              cg_image_rgb_to_gray    (struct cg_image *im);
+CG_API struct cg_imagef* cg_image_clone_to_imagef(struct cg_image *im);
+CG_API struct cg_imagef* cg_imagef_clone         (struct cg_imagef *im);
+CG_API void              cg_imagef_rgb_to_gray   (struct cg_imagef *im);
+CG_API struct cg_image*  cg_imagef_clone_to_image(struct cg_imagef *im);
+CG_API void              cg_image_to_ycbcr       (struct cg_image *im);
+CG_API void              cg_image_normalise      (struct cg_image *im);
+CG_API void              cg_image_blur_gauss_2d  (struct cg_image *im, float sigma, int n);
 /*CG_API void             cg_image_blur_box_2d   (const struct cg_image *src, struct cg_image *dst, const unsigned int* boxes, const int n);
   CG_API unsigned int*    cg_image_blur_boxes    (const double sigma, const int n);*/
 /* END OF API ================================================================*/
@@ -40,10 +46,18 @@ CG_API void             cg_image_blur_gauss_2d  (struct cg_image *im, float sigm
 /* IMPLEMENTATION ============================================================*/
 struct cg_image
 {
-   int   dims; /* number of dimensions, e.g. 2 for 2d*/
-	int   comp; /* number of components, e.g. 3 for rgb image */
-	int  *size; /* size of each dimension, [w][h][d] */
-	void *data; /* TYPE* data, can be allocated  with stretchy_buffer */
+	int    dims; 			/* number of dimensions, e.g. 2 for 2d*/
+	int    comp; 			/* number of components, e.g. 3 for rgb image */
+	int   *size; 			/* size of each dimension, [w][h][d] */
+	unsigned char *data; /* data */
+};
+
+struct cg_imagef
+{
+	int    dims; 			/* number of dimensions, e.g. 2 for 2d*/
+	int    comp; 			/* number of components, e.g. 3 for rgb image */
+	int   *size; 			/* size of each dimension, [w][h][d] */
+	float *data; 			/* data */
 };
 
 CG_API struct cg_image* cg_image_load(char const *filename)
@@ -69,8 +83,6 @@ CG_API void cg_image_free(struct cg_image *im)
 CG_API void cg_image_rgb_to_gray(struct cg_image *im)
 {
 	unsigned int i=0, ptr=0, elms=1;
-	unsigned char *data = (unsigned char*)im->data;
-
 	assert(im->comp == 3);
 
 	for (i=0; i<im->dims; ++i)
@@ -78,35 +90,103 @@ CG_API void cg_image_rgb_to_gray(struct cg_image *im)
 
 	for (i=0; i<elms; ++i)
 	{
-		unsigned char  r = data[ptr++];
-		unsigned char  g = data[ptr++];
-		unsigned char  b = data[ptr++];
+		unsigned char  r = im->data[ptr++];
+		unsigned char  g = im->data[ptr++];
+		unsigned char  b = im->data[ptr++];
 
-		data[i] = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+		im->data[i] = 0.2126 * r + 0.7152 * g + 0.0722 * b;
 	}
 	im->comp = 1;
-	data = realloc(data, sizeof(data)/3);
+	im->data = realloc(im->data, sizeof(unsigned char)*elms);
 }
 
-CG_API struct cg_image* cg_image_clone(struct cg_image *im)
+CG_API void cg_imagef_rgb_to_gray(struct cg_imagef *im)
 {
-	unsigned int i=0, elms=1;
-	struct cg_image *out = NULL;
-   unsigned char* idata = NULL;
-   float* odata = NULL;
-
-   out = malloc(sizeof(struct cg_image));
-   out->dims = im->dims;
-	out->comp = im->comp;
-   out->data = malloc(sizeof(float)*elms);
-   odata = (float*)out->data;
-   idata = (unsigned char*)im->data;
+	unsigned int i=0, ptr=0, elms=1;
+	assert(im->comp == 3);
 
 	for (i=0; i<im->dims; ++i)
 		elms *= im->size[i];
 
+	for (i=0; i<elms; ++i)
+	{
+		float r = im->data[ptr++];
+		float g = im->data[ptr++];
+		float b = im->data[ptr++];
 
-	/* todo deal with types */
+		im->data[i] = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+	}
+	im->comp = 1;
+	im->data = realloc(im->data, sizeof(float)*elms);
+}
+
+CG_API struct cg_image* cg_image_clone(struct cg_image *im)
+{
+	struct cg_image *out = NULL;
+	unsigned int i=0, elms=1;
+	out = malloc(sizeof(struct cg_image));
+	out->dims = im->dims;
+	out->comp = im->comp;
+
+	for (i=0; i<im->dims; ++i)
+		elms *= im->size[i];
+
+	out->data = malloc(sizeof(unsigned char)*elms);
+	memcpy(out->data, im->data, sizeof(unsigned char)*elms);
+	return out;
+}
+
+CG_API struct cg_imagef* cg_imagef_clone(struct cg_imagef *im)
+{
+	struct cg_imagef *out = NULL;
+	unsigned int i=0, elms=1;
+	out = malloc(sizeof(struct cg_imagef));
+	out->dims = im->dims;
+	out->comp = im->comp;
+
+	for (i=0; i<im->dims; ++i)
+		elms *= im->size[i];
+
+	out->data = malloc(sizeof(float)*elms);
+	memcpy(out->data, im->data, sizeof(float)*elms);
+	return out;
+}
+
+CG_API struct cg_imagef* cg_image_clone_to_imagef(struct cg_image *im)
+{
+	struct cg_imagef *out = NULL;
+	unsigned int i=0, elms=1;
+	out = malloc(sizeof(struct cg_imagef));
+	out->dims = im->dims;
+	out->comp = im->comp;
+
+	for (i=0; i<im->dims; ++i)
+		elms *= im->size[i];
+
+	out->data = malloc(sizeof(float)*elms);
+
+	for (i=0; i<elms; ++i)
+		out->data[i] = im->data[i];
+
+	return out;
+}
+
+CG_API struct cg_image*  cg_imagef_clone_to_image(struct cg_imagef *im)
+{
+	struct cg_image *out = NULL;
+	unsigned int i=0, elms=1;
+	out = malloc(sizeof(struct cg_image));
+	out->dims = im->dims;
+	out->comp = im->comp;
+
+	for (i=0; i<im->dims; ++i)
+		elms *= im->size[i];
+
+	out->data = malloc(sizeof(unsigned int)*elms);
+
+	for (i=0; i<elms; ++i)
+		out->data[i] = im->data[i];
+
 	return out;
 }
 

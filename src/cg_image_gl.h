@@ -19,7 +19,7 @@ extern "C" {
 
 /* START OF API ==============================================================*/
 struct cg_image;
-CG_API unsigned int cg_image_bind_ubyte(struct cg_image *im);
+CG_API unsigned int cg_image_bind(struct cg_image *im);
 /* END OF API ================================================================*/
 
 #ifdef __cplusplus
@@ -30,7 +30,7 @@ CG_API unsigned int cg_image_bind_ubyte(struct cg_image *im);
 #ifdef CG_IMAGE_IMPLEMENTATION
 
 /* IMPLEMENTATION ============================================================*/
-CG_API unsigned int cg_image_bind_ubyte(struct cg_image *im)
+CG_API unsigned int cg_image_bind(struct cg_image *im)
 {
 	GLuint tex;
 	glGenTextures(1, &tex);
