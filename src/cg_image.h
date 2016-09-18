@@ -1,6 +1,6 @@
 /*==============================================================================
 	cg_image, single-header
-	multi-dimensional separate float and byte functions
+	multi-dimensional & component, unsigned char, unsigned short, float, or doulbe types
    copyright chris g. willcocks MIT license
 ==============================================================================*/
 
@@ -19,16 +19,13 @@ extern "C" {
 
 /* START OF API ==============================================================*/
 struct cg_image;
-struct cg_imagef;
 
 CG_API struct cg_image*  cg_image_load           (char const *filename);
 CG_API void              cg_image_free           (struct cg_image *im);
-CG_API struct cg_image*  cg_image_clone          (struct cg_image *im);
+CG_API struct cg_image*  cg_image_clone          (struct cg_image *im, int bypp);
 CG_API void              cg_image_rgb_to_gray    (struct cg_image *im);
-CG_API struct cg_imagef* cg_image_clone_to_imagef(struct cg_image *im);
-CG_API struct cg_imagef* cg_imagef_clone         (struct cg_imagef *im);
-CG_API void              cg_imagef_rgb_to_gray   (struct cg_imagef *im);
-CG_API struct cg_image*  cg_imagef_clone_to_image(struct cg_imagef *im);
+CG_API void 				 cg_image_to_float		 (struct cg_image *im);
+CG_API void 				 cg_image_to_bytes 		 (struct cg_image *im);
 CG_API void              cg_image_to_ycbcr       (struct cg_image *im);
 CG_API void              cg_image_normalise      (struct cg_image *im);
 CG_API void              cg_image_blur_gauss_2d  (struct cg_image *im, float sigma, int n);
@@ -46,33 +43,32 @@ CG_API void              cg_image_blur_gauss_2d  (struct cg_image *im, float sig
 /* IMPLEMENTATION ============================================================*/
 struct cg_image
 {
-	int    dims; 			/* number of dimensions, e.g. 2 for 2d*/
-	int    comp; 			/* number of components, e.g. 3 for rgb image */
-	int   *size; 			/* size of each dimension, [w][h][d] */
-	unsigned char *data; /* data */
-};
-
-struct cg_imagef
-{
-	int    dims; 			/* number of dimensions, e.g. 2 for 2d*/
-	int    comp; 			/* number of components, e.g. 3 for rgb image */
-	int   *size; 			/* size of each dimension, [w][h][d] */
-	float *data; 			/* data */
+	unsigned char *data; /* data: warning may also be floating point */
+	unsigned int  *size; /* size of each dimension, [w][h][d] */
+	unsigned char  dims; /* number of dimensions, e.g. 2 for 2d */
+	unsigned char  comp; /* number of components, e.g. 3 for rgb image */
+	unsigned char  bypp; /* number of bytes per pixel, e.g. 1, 2, 4, or 8 */
 };
 
 CG_API struct cg_image* cg_image_load(char const *filename)
 {
+	int width=0, height=0, comp=0;
 	struct cg_image *im = (struct cg_image*)malloc(sizeof(struct cg_image));
 
+	im->bypp = 1;
 	im->dims = 2;
-	im->size = malloc(im->dims * sizeof(int));
-	im->data = stbi_load(filename, &im->size[0], &im->size[1], &im->comp, 0);
+	im->size = malloc(im->dims * sizeof(unsigned char));
+	im->data = stbi_load(filename, &width, &height, &comp, 0);
+	im->size[0] = width;
+	im->size[1] = height;
+	im->comp = comp;
 
 	return im;
 }
 
 CG_API void cg_image_free(struct cg_image *im)
 {
+	im->bypp = 0;
 	im->dims = 0;
 	im->comp = 0;
 	free(im->data);
@@ -88,104 +84,102 @@ CG_API void cg_image_rgb_to_gray(struct cg_image *im)
 	for (i=0; i<im->dims; ++i)
 		elms *= im->size[i];
 
-	for (i=0; i<elms; ++i)
+	if (im->bypp == 1)
 	{
-		unsigned char  r = im->data[ptr++];
-		unsigned char  g = im->data[ptr++];
-		unsigned char  b = im->data[ptr++];
+		unsigned char *data = im->data;
+		for (i=0; i<elms; ++i)
+		{
+			unsigned char r = data[ptr++];
+			unsigned char g = data[ptr++];
+			unsigned char b = data[ptr++];
 
-		im->data[i] = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+			data[i] = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+		}
+		data = realloc(im->data, sizeof(unsigned char)*elms);
+	}
+	else if (im->bypp == 4)
+	{
+		float *data = (float*)im->data;
+		for (i=0; i<elms; ++i)
+		{
+			float r = data[ptr++];
+			float g = data[ptr++];
+			float b = data[ptr++];
+
+			data[i] = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+		}
+		data = realloc(im->data, sizeof(float)*elms);
+	}
+	else if (im->bypp == 8)
+	{
+		double *data = (double*)im->data;
+		for (i=0; i<elms; ++i)
+		{
+			double r = data[ptr++];
+			double g = data[ptr++];
+			double b = data[ptr++];
+
+			data[i] = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+		}
+		data = realloc(im->data, sizeof(double)*elms);
+	}
+	else if (im->bypp == 2)
+	{
+		unsigned short *data = (unsigned short*)im->data;
+		for (i=0; i<elms; ++i)
+		{
+			unsigned short r = data[ptr++];
+			unsigned short g = data[ptr++];
+			unsigned short b = data[ptr++];
+
+			data[i] = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+		}
+		data = realloc(im->data, sizeof(unsigned short)*elms);
 	}
 	im->comp = 1;
-	im->data = realloc(im->data, sizeof(unsigned char)*elms);
 }
 
-CG_API void cg_imagef_rgb_to_gray(struct cg_imagef *im)
-{
-	unsigned int i=0, ptr=0, elms=1;
-	assert(im->comp == 3);
-
-	for (i=0; i<im->dims; ++i)
-		elms *= im->size[i];
-
-	for (i=0; i<elms; ++i)
-	{
-		float r = im->data[ptr++];
-		float g = im->data[ptr++];
-		float b = im->data[ptr++];
-
-		im->data[i] = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-	}
-	im->comp = 1;
-	im->data = realloc(im->data, sizeof(float)*elms);
-}
-
-CG_API struct cg_image* cg_image_clone(struct cg_image *im)
+CG_API struct cg_image* cg_image_clone(struct cg_image *im, int bypp)
 {
 	struct cg_image *out = NULL;
 	unsigned int i=0, elms=1;
 	out = malloc(sizeof(struct cg_image));
 	out->dims = im->dims;
 	out->comp = im->comp;
+	out->bypp = bypp;
 
 	for (i=0; i<im->dims; ++i)
 		elms *= im->size[i];
 
-	out->data = malloc(sizeof(unsigned char)*elms);
-	memcpy(out->data, im->data, sizeof(unsigned char)*elms);
-	return out;
-}
-
-CG_API struct cg_imagef* cg_imagef_clone(struct cg_imagef *im)
-{
-	struct cg_imagef *out = NULL;
-	unsigned int i=0, elms=1;
-	out = malloc(sizeof(struct cg_imagef));
-	out->dims = im->dims;
-	out->comp = im->comp;
-
-	for (i=0; i<im->dims; ++i)
-		elms *= im->size[i];
-
-	out->data = malloc(sizeof(float)*elms);
-	memcpy(out->data, im->data, sizeof(float)*elms);
-	return out;
-}
-
-CG_API struct cg_imagef* cg_image_clone_to_imagef(struct cg_image *im)
-{
-	struct cg_imagef *out = NULL;
-	unsigned int i=0, elms=1;
-	out = malloc(sizeof(struct cg_imagef));
-	out->dims = im->dims;
-	out->comp = im->comp;
-
-	for (i=0; i<im->dims; ++i)
-		elms *= im->size[i];
-
-	out->data = malloc(sizeof(float)*elms);
-
-	for (i=0; i<elms; ++i)
-		out->data[i] = im->data[i];
-
-	return out;
-}
-
-CG_API struct cg_image*  cg_imagef_clone_to_image(struct cg_imagef *im)
-{
-	struct cg_image *out = NULL;
-	unsigned int i=0, elms=1;
-	out = malloc(sizeof(struct cg_image));
-	out->dims = im->dims;
-	out->comp = im->comp;
-
-	for (i=0; i<im->dims; ++i)
-		elms *= im->size[i];
-
-	out->data = malloc(sizeof(unsigned int)*elms);
-
-	for (i=0; i<elms; ++i)
-		out->data[i] = im->data[i];
+	/* todo: replace same size arrays with memcpy calls */
+	if (im->bypp == 1)
+	{
+		if 	  (bypp == 1) { unsigned char *id = (unsigned char*)im->data; unsigned char  *cd = (unsigned char *)out->data; cd = malloc(sizeof(unsigned char	)*elms); for (i=0; i<elms; ++i) { cd[i] = (unsigned char	)id[i]; } }
+		else if (bypp == 2) { unsigned char *id = (unsigned char*)im->data; unsigned short *cd = (unsigned short*)out->data; cd = malloc(sizeof(unsigned short)*elms); for (i=0; i<elms; ++i) { cd[i] = (unsigned short)id[i]; } }
+		else if (bypp == 4) { unsigned char *id = (unsigned char*)im->data; float 			  *cd = (float		  	  *)out->data; cd = malloc(sizeof(float			)*elms); for (i=0; i<elms; ++i) { cd[i] = (float			)id[i]; } }
+		else if (bypp == 8) { unsigned char *id = (unsigned char*)im->data; double 		  *cd = (double		  *)out->data; cd = malloc(sizeof(double			)*elms); for (i=0; i<elms; ++i) { cd[i] = (double			)id[i]; } }
+	}
+	else if (im->bypp == 2)
+	{
+		if 	  (bypp == 1) { unsigned short *id = (unsigned short*)im->data; unsigned char  *cd = (unsigned char *)out->data; cd = malloc(sizeof(unsigned char	)*elms); for (i=0; i<elms; ++i) { cd[i] = (unsigned char	)id[i]; } }
+		else if (bypp == 2) { unsigned short *id = (unsigned short*)im->data; unsigned short *cd = (unsigned short*)out->data; cd = malloc(sizeof(unsigned short	)*elms); for (i=0; i<elms; ++i) { cd[i] = (unsigned short)id[i]; } }
+		else if (bypp == 4) { unsigned short *id = (unsigned short*)im->data; float 			 *cd = (float		  	 *)out->data; cd = malloc(sizeof(float				)*elms); for (i=0; i<elms; ++i) { cd[i] = (float			)id[i]; } }
+		else if (bypp == 8) { unsigned short *id = (unsigned short*)im->data; double 		  	 *cd = (double		  	 *)out->data; cd = malloc(sizeof(double			)*elms); for (i=0; i<elms; ++i) { cd[i] = (double			)id[i]; } }
+	}
+	else if (im->bypp == 4)
+	{
+		if 	  (bypp == 1) { float *id = (float*)im->data; unsigned char  *cd = (unsigned char *)out->data; cd = malloc(sizeof(unsigned char )*elms); for (i=0; i<elms; ++i) { cd[i] = (unsigned char )id[i]; } }
+		else if (bypp == 2) { float *id = (float*)im->data; unsigned short *cd = (unsigned short*)out->data; cd = malloc(sizeof(unsigned short)*elms); for (i=0; i<elms; ++i) { cd[i] = (unsigned short)id[i]; } }
+		else if (bypp == 4) { float *id = (float*)im->data; float 			 *cd = (float		  	 *)out->data; cd = malloc(sizeof(float			  )*elms); for (i=0; i<elms; ++i) { cd[i] = (float			  )id[i]; } }
+		else if (bypp == 8) { float *id = (float*)im->data; double 		    *cd = (double		    *)out->data; cd = malloc(sizeof(double		  )*elms); for (i=0; i<elms; ++i) { cd[i] = (double		  )id[i]; } }
+	}
+	else if (im->bypp == 8)
+	{
+		if 	  (bypp == 1) { double *id = (double*)im->data; unsigned char  *cd = (unsigned char *)out->data; cd = malloc(sizeof(unsigned char )*elms); for (i=0; i<elms; ++i) { cd[i] = (unsigned char )id[i]; } }
+		else if (bypp == 2) { double *id = (double*)im->data; unsigned short *cd = (unsigned short*)out->data; cd = malloc(sizeof(unsigned short)*elms); for (i=0; i<elms; ++i) { cd[i] = (unsigned short)id[i]; } }
+		else if (bypp == 4) { double *id = (double*)im->data; float 			*cd = (float		  	*)out->data; cd = malloc(sizeof(float			 )*elms); for (i=0; i<elms; ++i) { cd[i] = (float			 )id[i]; } }
+		else if (bypp == 8) { double *id = (double*)im->data; double 		   *cd = (double		   *)out->data; cd = malloc(sizeof(double			 )*elms); for (i=0; i<elms; ++i) { cd[i] = (double			 )id[i]; } }
+	}
 
 	return out;
 }

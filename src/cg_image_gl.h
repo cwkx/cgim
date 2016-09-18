@@ -32,20 +32,29 @@ CG_API unsigned int cg_image_bind(struct cg_image *im);
 /* IMPLEMENTATION ============================================================*/
 CG_API unsigned int cg_image_bind(struct cg_image *im)
 {
-	GLuint tex;
+	GLuint tex, tex_dim, tex_form_1, tex_form_2, tex_type;
 	glGenTextures(1, &tex);
-	glBindTexture(GL_TEXTURE_2D, tex);
-	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
-	if (im->comp == 3)
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, im->size[0], im->size[1], 0, GL_RGB, GL_UNSIGNED_BYTE, im->data);
-	else if (im->comp == 1)
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, im->size[0], im->size[1], 0, GL_RED, GL_UNSIGNED_BYTE, im->data);
-	else
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, im->size[0], im->size[1], 0, GL_RGBA, GL_UNSIGNED_BYTE, im->data);
+	assert(im->dims == 1 || im->dims == 2 || im->dims == 3);
+	assert(im->comp == 1 || im->comp == 3 || im->comp == 4);
+	assert(im->bypp == 1 || im->bypp == 4);
+
+	if 	  (im->dims == 2) tex_dim = GL_TEXTURE_2D;
+	else if (im->dims == 3) tex_dim = GL_TEXTURE_3D;
+	else 							tex_dim = GL_TEXTURE_1D;
+	if      (im->comp == 1) { tex_form_1 = GL_RED;  tex_form_2 = GL_RED;  }
+	else if (im->comp == 3) { tex_form_1 = GL_RGB;  tex_form_2 = GL_RGB;  }
+	else 							{ tex_form_1 = GL_RGBA; tex_form_2 = GL_RGBA; }
+	if      (im->bypp == 1) tex_type = GL_UNSIGNED_BYTE;
+	else if (im->bypp == 4) tex_type = GL_FLOAT;
+
+	glBindTexture(tex_dim, tex);
+	glTexParameterf(tex_dim, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameterf(tex_dim, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameterf(tex_dim, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameterf(tex_dim, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+	glTexImage2D(tex_dim, 0, tex_form_1, im->size[0], im->size[1], 0, tex_form_2, tex_type, im->data);
 
 	return tex;
 }
