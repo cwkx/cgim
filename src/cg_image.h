@@ -23,7 +23,6 @@ CG_API struct cg_image*  cg_image_load           (char const *filename);
 CG_API void              cg_image_free           (struct cg_image *im);
 CG_API struct cg_image*  cg_image_clone          (struct cg_image *im, int bypp);
 CG_API void              cg_image_rgb_to_gray    (struct cg_image *im);
-CG_API void              cg_image_to_ycbcr       (struct cg_image *im);
 CG_API void              cg_image_normalise      (struct cg_image *im);
 CG_API void              cg_image_blur_gauss_2d  (struct cg_image *im, float sigma, int n);
 /*CG_API void             cg_image_blur_box_2d   (const struct cg_image *src, struct cg_image *dst, const unsigned int* boxes, const int n);
@@ -52,8 +51,8 @@ CG_API struct cg_image* cg_image_load(char const *filename)
    int width=0, height=0, comp=0;
    struct cg_image *im = (struct cg_image*)malloc(sizeof(struct cg_image));
 
-   im->bypp = 1;
-   im->dims = 2;
+   im->bypp = 1; /* stb supports formats of unsigned char */
+   im->dims = 2; /* stb supports 2d image formats */
    im->size = malloc(im->dims * sizeof(unsigned int));
    im->data = stbi_load(filename, &width, &height, &comp, 0);
    im->size[0] = width;
@@ -71,6 +70,64 @@ CG_API void cg_image_free(struct cg_image *im)
    free(im->data);
    free(im->size);
    free(im);
+}
+
+CG_API struct cg_image* cg_image_clone(struct cg_image *im, int bypp)
+{
+   struct cg_image *out = NULL;
+   unsigned int i=0, elms=1;
+
+	assert(im->bypp == 1 || im->bypp == 2 || im->bypp == 4 || im->bypp == 8);
+	assert(    bypp == 1 ||     bypp == 2 ||     bypp == 4 ||     bypp == 8);
+
+   out = malloc(sizeof(struct cg_image));
+   out->dims = im->dims;
+   out->comp = im->comp;
+   out->bypp = bypp;
+	out->size = malloc(im->dims * sizeof(unsigned int));
+   memcpy(out->size, im->size, im->dims * sizeof(unsigned int));
+
+	elms = im->comp;
+   for (i=0; i<im->dims; ++i)
+      elms *= im->size[i];
+
+	/* copy from a source type into a destination type */
+	#define CG_IMAGE_CLONE(from,to) from *id = (from *)im->data; to *cd = NULL; \
+		out->data = malloc(sizeof(to)*elms); cd = (to *)out->data; for (i=0; i<elms; ++i) cd[i] = (to)id[i]
+
+	/* could have a branch if im->bypp == bypp then do memcpy for each */
+   if (im->bypp == 1)
+   {
+      if (bypp == 1) { CG_IMAGE_CLONE(unsigned char, unsigned char); }
+		if (bypp == 2) { CG_IMAGE_CLONE(unsigned char, unsigned short); }
+		if (bypp == 4) { CG_IMAGE_CLONE(unsigned char, float); }
+		if (bypp == 8) { CG_IMAGE_CLONE(unsigned char, double); }
+   }
+	else if (im->bypp == 4)
+   {
+		if (bypp == 1) { CG_IMAGE_CLONE(float, unsigned char); }
+		if (bypp == 2) { CG_IMAGE_CLONE(float, unsigned short); }
+		if (bypp == 4) { CG_IMAGE_CLONE(float, float); }
+		if (bypp == 8) { CG_IMAGE_CLONE(float, double); }
+   }
+   else if (im->bypp == 8)
+   {
+		if (bypp == 1) { CG_IMAGE_CLONE(double, unsigned char); }
+		if (bypp == 2) { CG_IMAGE_CLONE(double, unsigned short); }
+		if (bypp == 4) { CG_IMAGE_CLONE(double, float); }
+		if (bypp == 8) { CG_IMAGE_CLONE(double, double); }
+   }
+   else if (im->bypp == 2)
+   {
+		if (bypp == 1) { CG_IMAGE_CLONE(unsigned short, unsigned char); }
+		if (bypp == 2) { CG_IMAGE_CLONE(unsigned short, unsigned short); }
+		if (bypp == 4) { CG_IMAGE_CLONE(unsigned short, float); }
+		if (bypp == 8) { CG_IMAGE_CLONE(unsigned short, double); }
+   }
+
+	#undef CG_IMAGE_CLONE
+
+   return out;
 }
 
 CG_API void cg_image_rgb_to_gray(struct cg_image *im)
@@ -101,63 +158,33 @@ CG_API void cg_image_rgb_to_gray(struct cg_image *im)
    im->comp = 1;
 }
 
-CG_API struct cg_image* cg_image_clone(struct cg_image *im, int bypp)
+CG_API void cg_image_normalise(struct cg_image *im)
 {
-   struct cg_image *out = NULL;
-   unsigned int i=0, elms=1;
+	unsigned int i=0, elms=1;
+	double dmax = DBL_MIN, dmin = DBL_MAX;
 
-	assert(im->bypp == 1 || im->bypp == 2 || im->bypp == 4 || im->bypp == 8);
-	assert(    bypp == 1 ||     bypp == 2 ||     bypp == 4 ||     bypp == 8);
+	elms = im->comp;
+	for (i=0; i<im->dims; ++i)
+		elms *= im->size[i];
 
-   out = malloc(sizeof(struct cg_image));
-   out->dims = im->dims;
-   out->comp = im->comp;
-   out->bypp = bypp;
-	out->size = malloc(im->dims * sizeof(unsigned int));
-   memcpy(out->size, im->size, im->dims * sizeof(unsigned int));
+	#define CG_IMAGE_NORMALISE(type,upper) \
+	{ \
+		type* data = (type*)im->data; \
+		for (i=0; i<elms; ++i) \
+		{ \
+			if (data[i] > dmax) dmax = data[i]; \
+			if (data[i] < dmin) dmin = data[i]; \
+		} \
+		for (i=0; i<elms; ++i) \
+			data[i] = (type)((data[i]-dmin)/(dmax-dmin) * upper); \
+	}
 
-   for (i=0; i<im->dims; ++i)
-      elms *= im->size[i];
+	if 	  (im->bypp == 1) { CG_IMAGE_NORMALISE(unsigned char,255); }
+   else if (im->bypp == 4) { CG_IMAGE_NORMALISE(float, 1.0); }
+   else if (im->bypp == 8) { CG_IMAGE_NORMALISE(double, 1.0); }
+   else if (im->bypp == 2) { CG_IMAGE_NORMALISE(unsigned short, 65535); }
 
-	elms *= im->comp;
-
-	/* copy from a source type into a destination type */
-	#define CG_IMAGE_CLONE(from,to) from *id = (from *)im->data; to *cd = NULL; \
-		out->data = malloc(sizeof(to)*elms); cd = (to *)out->data; for (i=0; i<elms; ++i) cd[i] = (to)id[i]
-
-	/* could have a branch if im->bypp == bypp then do memcpy for each */
-   if (im->bypp == 1)
-   {
-      if (bypp == 1) { CG_IMAGE_CLONE(unsigned char, unsigned char); }
-		if (bypp == 2) { CG_IMAGE_CLONE(unsigned char, unsigned short); }
-		if (bypp == 4) { CG_IMAGE_CLONE(unsigned char, float); }
-		if (bypp == 8) { CG_IMAGE_CLONE(unsigned char, double); }
-   }
-   else if (im->bypp == 2)
-   {
-		if (bypp == 1) { CG_IMAGE_CLONE(unsigned short, unsigned char); }
-		if (bypp == 2) { CG_IMAGE_CLONE(unsigned short, unsigned short); }
-		if (bypp == 4) { CG_IMAGE_CLONE(unsigned short, float); }
-		if (bypp == 8) { CG_IMAGE_CLONE(unsigned short, double); }
-   }
-   else if (im->bypp == 4)
-   {
-		if (bypp == 1) { CG_IMAGE_CLONE(float, unsigned char); }
-		if (bypp == 2) { CG_IMAGE_CLONE(float, unsigned short); }
-		if (bypp == 4) { CG_IMAGE_CLONE(float, float); }
-		if (bypp == 8) { CG_IMAGE_CLONE(float, double); }
-   }
-   else if (im->bypp == 8)
-   {
-		if (bypp == 1) { CG_IMAGE_CLONE(double, unsigned char); }
-		if (bypp == 2) { CG_IMAGE_CLONE(double, unsigned short); }
-		if (bypp == 4) { CG_IMAGE_CLONE(double, float); }
-		if (bypp == 8) { CG_IMAGE_CLONE(double, double); }
-   }
-
-	#undef CG_IMAGE_CLONE
-
-   return out;
+	#undef CG_IMAGE_NORMALISE
 }
 
 /*

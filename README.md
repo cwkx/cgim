@@ -27,3 +27,4 @@ please don't use this yet! it's an experimental framework for my own personal re
 - install atom package "dbg-gdb"
 - press ````F9```` somewhere in code
 - right click build/cgim in atom, and ````Debug>Build```` with GDB
+ 

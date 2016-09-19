@@ -27,6 +27,7 @@
 #include <string.h>
 #include <math.h>
 #include <assert.h>
+#include <float.h>
 #include <limits.h>
 #include <time.h>
 #include "../deps/gl/glew.h"
@@ -121,11 +122,7 @@ int main()
    static GLFWwindow* win = NULL;
    int width = 0, height = 0;
    struct nk_context *ctx = NULL;
-   struct cg_image* im = NULL;
-   struct cg_image* dst = NULL;
-   struct nk_image tex;
-	unsigned char *data = NULL;
-
+	struct nk_image tex;
 
    /* glfw */
    glfwSetErrorCallback(errorCallback);
@@ -162,18 +159,21 @@ int main()
       nk_glfw3_font_stash_end();
    }
 
-   /* image */
-   im = cg_image_load("../data/lena2D.png");
+	 /* mini image test */
+	{
+		struct cg_image* im = NULL;
+		struct cg_image* dst = NULL;
+		int i=0;
+		float *data = NULL;
 
-   /*cg_image_rgb_to_gray(im);*/
-	dst = cg_image_clone(im, 1);
-	tex = nk_image_id(cg_image_bind(im));
-   cg_image_free(im);
-
-	data = (unsigned char*)dst->data;
-
-	printf("dst: %i\n", data[512*500]);
-	/*cg_image_free(dst);*/
+		im = cg_image_load("../data/lena2D.png");
+	   cg_image_rgb_to_gray(im);
+		dst = cg_image_clone(im, 4);
+		cg_image_normalise(dst);
+		tex = nk_image_id(cg_image_bind(dst));
+	   cg_image_free(im);
+		cg_image_free(dst);
+	}
 
    glfwShowWindow(win);
    while (!glfwWindowShouldClose(win))
