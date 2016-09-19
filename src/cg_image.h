@@ -260,7 +260,7 @@ CG_API void cg_image_blur_gauss_2d(struct cg_image *im, float sigma, int n)
 
 CG_API void cg_image_blur_box_2d(const struct cg_image *src, struct cg_image *dst, const unsigned int* boxes, const int n)
 {
-   /* todo: w */
+   /* todo: profile against: http://blog.ivank.net/fastest-gaussian-blur.html */
 }
 
 CG_API unsigned int* cg_image_blur_boxes(const double sigma, const int n)
