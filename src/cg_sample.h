@@ -34,27 +34,27 @@ CG_API void                cg_sample_clean(struct cg_sample *x);
 /* IMPLEMENTATION ============================================================*/
 struct cg_sample
 {
-	unsigned char a,b,c,d;  // example data
-	void *x;                /* TYPE data array */
+   unsigned char a,b,c,d;  // example data
+   void *x;                /* TYPE data array */
 };
 CG_API int cg_sample_func_1(int)
 {
-	return 2*x;
+   return 2*x;
 }
 CG_API void cg_sample_func_3(struct cg_sample *x)
 {
-	x->a = 2;
+   x->a = 2;
 }
 CG_API struct cg_sample* cg_sample_alloc(int x)
 {
-	struct cg_sample *s = malloc(sizeof(struct cg_sample));
-	s->a = x;
-	return s;
+   struct cg_sample *s = malloc(sizeof(struct cg_sample));
+   s->a = x;
+   return s;
 }
 CG_API void cg_sample_clean(struct cg_sample *s)
 {
-	free(s->x);
-	free(s);
+   free(s->x);
+   free(s);
 }
 /* END OF IMPLEMENTATION =====================================================*/
 

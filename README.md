@@ -1,5 +1,5 @@
 # cgim
-an experimental framework for computer graphics, image processing, machine learning and pattern analysis
+please don't use this yet! it's an experimental framework for my own personal research in computer graphics, image processing, machine learning and pattern analysis
 
 ### about
 - written in C89 for compatibility
@@ -20,5 +20,5 @@ an experimental framework for computer graphics, image processing, machine learn
 - ````clang ../src/cg_app.c -std=c89 -pedantic -Werror `pkg-config --cflags --libs --static glfw3 glew x11 xxf86vm` -o cgim && ./cgim````
 - recommended to use formatter-astyle atom package
   - allman brackets
-  - 3 indent, tab
+  - 3 indent, spaces
   - all unchecked except keep one line blocks and keep one line statements
