@@ -25,8 +25,6 @@ CG_API struct cg_image*  cg_image_clone          (struct cg_image *im, int bypp)
 CG_API void              cg_image_rgb_to_gray    (struct cg_image *im);
 CG_API void              cg_image_normalise      (struct cg_image *im);
 CG_API void              cg_image_blur_gauss_2d  (struct cg_image *im, float sigma, int n);
-/*CG_API void             cg_image_blur_box_2d   (const struct cg_image *src, struct cg_image *dst, const unsigned int* boxes, const int n);
-  CG_API unsigned int*    cg_image_blur_boxes    (const double sigma, const int n);*/
 /* END OF API ================================================================*/
 
 #ifdef __cplusplus
@@ -39,7 +37,7 @@ CG_API void              cg_image_blur_gauss_2d  (struct cg_image *im, float sig
 /* IMPLEMENTATION ============================================================*/
 struct cg_image
 {
-   void *data; /* can be unsigned bytes, shorts, floats or doubles  */
+   void *data; /* can be u_bytes, u_shorts, floats or doubles  */
    unsigned int  *size; /* size of each dimension, [w][h][d] */
    unsigned char  dims; /* number of dimensions, e.g. 2 for 2d */
    unsigned char  comp; /* number of components, e.g. 3 for rgb image */
@@ -187,28 +185,82 @@ CG_API void cg_image_normalise(struct cg_image *im)
 	#undef CG_IMAGE_NORMALISE
 }
 
-/*
-CG_API void cg_image_blur_gauss_2d(const struct cg_image *
-src, struct cg_image *dst, c
-onst double sigma)
+void gaussianiir2d(float *image, size_t width, size_t height, float sigma, int numsteps)
 {
-  int n = 3;
-  unsigned int* boxes = cg_image_blur_boxes(sigma, n);
-  cg_image_blur_box_2d(src, dst, boxes, n);
-  free(boxes);
-}
-*/
+    const size_t numpixels = width*height;
+    double lambda, dnu;
+    float nu, boundaryscale, postscale;
+    float *ptr;
+    size_t i, x, y;
+    int step;
 
-/* Reference: Alvarez, Mazorra, "Signal and Image Restoration using Shock Filters and Anisotropic Diffusion," SIAM J. on Numerical Analysis, vol. 31, no. 2, pp. 590-605, 1994.*/
+    if(sigma <= 0 || numsteps < 0)
+        return;
+
+    lambda = (sigma*sigma)/(2.0*numsteps);
+    dnu = (1.0 + 2.0*lambda - sqrt(1.0 + 4.0*lambda))/(2.0*lambda);
+    nu = (float)dnu;
+    boundaryscale = (float)(1.0/(1.0 - dnu));
+    postscale = (float)(pow(dnu/lambda,2*numsteps));
+
+    /* Filter horizontally along each row */
+    for(y = 0; y < height; y++)
+    {
+        for(step = 0; step < numsteps; step++)
+        {
+            ptr = image + width*y;
+            ptr[0] *= boundaryscale;
+
+            /* Filter rightwards */
+            for(x = 1; x < width; x++)
+                ptr[x] += nu*ptr[x - 1];
+
+            ptr[x = width - 1] *= boundaryscale;
+
+            /* Filter leftwards */
+            for(; x > 0; x--)
+                ptr[x - 1] += nu*ptr[x];
+        }
+    }
+
+    /* Filter vertically along each column */
+    for(x = 0; x < width; x++)
+    {
+        for(step = 0; step < numsteps; step++)
+        {
+            ptr = image + x;
+            ptr[0] *= boundaryscale;
+
+            /* Filter downwards */
+            for(i = width; i < numpixels; i += width)
+                ptr[i] += nu*ptr[i - width];
+
+            ptr[i = numpixels - width] *= boundaryscale;
+
+            /* Filter upwards */
+            for(; i > 0; i -= width)
+                ptr[i - width] += nu*ptr[i];
+        }
+    }
+
+    for(i = 0; i < numpixels; i++)
+        image[i] *= postscale;
+
+    return;
+}
+
+
 CG_API void cg_image_blur_gauss_2d(struct cg_image *im, float sigma, int n)
 {
-
+   float *data = (float*)im->data;
+   size_t width = (size_t)im->size[0];
+   size_t height = (size_t)im->size[1];
+   gaussianiir2d(data, width, height, sigma, n);
 }
 
 CG_API void cg_image_blur_box_2d(const struct cg_image *src, struct cg_image *dst, const unsigned int* boxes, const int n)
 {
    /* todo: w */
-
 }
 
 CG_API unsigned int* cg_image_blur_boxes(const double sigma, const int n)
