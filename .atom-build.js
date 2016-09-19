@@ -6,31 +6,34 @@ var cmdLibs = "`pkg-config --cflags --libs --static glfw3 glew x11 xxf86vm` ";
 var cmdOut = "-o cgim";
 
 module.exports = {
-   cmd: cmdPre + cmdBuild + "-g " + cmdFlags + cmdLibs + cmdOut,
-   name: "Build",
-   sh: true,
-   keymap: "f5",
-   atomCommandName: "CGIM:debug build",
    preBuild: function() {},
    postBuild: function() {},
    targets: {
-      "Run": {
+      "Run ": {
          cmd: cmdPre + "./cgim",
-         keymap: "f6",
+         keymap: "f4",
          atomCommandName: "CGIM:run"
+      },
+      "Debug and Run" : {
+         cmd: cmdPre + cmdBuild + "-g " + cmdFlags + cmdLibs + cmdOut + " && ./cgim",
+         name: "Build",
+         sh: true,
+         keymap: "f5",
+         atomCommandName: "CGIM:debug build"
+      },
+      "Build with Assembly": {
+         "cmd": cmdPre + cmdBuild + "-g -O3 " + cmdFlags + cmdLibs + cmdOut,
+         keymap: "f6",
+         atomCommandName: "CGIM:release build"
       },
       "View Assembly": {
          cmd: cmdPre +
-            "gdb --batch -ex \"disas {SELECTION}\" cgim > out.asm",
+            "gdb --batch -ex \"set disassembly-flavor intel\" -ex \"disas /s {SELECTION}\" cgim > out.asm",
+         keymap: "f7",
          atomCommandName: "CGIM:view assembly"
       },
-      "View Assembly CLANG TEST": {
-         cmd: cmdPre + cmdBuild + "-g -S -emit-llvm " + cmdFlags,
-         keymap: "f7",
-         atomCommandName: "CGIM:view assembly clang test"
-      },
       "Release Build": {
-         "cmd": cmdPre + cmdBuild + "-O2 " + cmdFlags + cmdLibs + cmdOut,
+         "cmd": cmdPre + cmdBuild + "-O3 " + cmdFlags + cmdLibs + cmdOut,
          keymap: "f8",
          atomCommandName: "CGIM:release build"
       }
