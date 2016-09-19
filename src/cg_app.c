@@ -124,6 +124,8 @@ int main()
    struct cg_image* im = NULL;
    struct cg_image* dst = NULL;
    struct nk_image tex;
+	unsigned char *data = NULL;
+
 
    /* glfw */
    glfwSetErrorCallback(errorCallback);
@@ -163,13 +165,15 @@ int main()
    /* image */
    im = cg_image_load("../data/lena2D.png");
 
-   /*cg_image_rgb_to_gray(im); */
-   dst = cg_image_clone(im, 1);
-
-   tex = nk_ima
-ge_id(cg_image_bind(dst));
+   /*cg_image_rgb_to_gray(im);*/
+	dst = cg_image_clone(im, 1);
+	tex = nk_image_id(cg_image_bind(im));
    cg_image_free(im);
-   /*cg_image_free(dst);*/
+
+	data = (unsigned char*)dst->data;
+
+	printf("dst: %i\n", data[512*500]);
+	/*cg_image_free(dst);*/
 
    glfwShowWindow(win);
    while (!glfwWindowShouldClose(win))

@@ -20,5 +20,10 @@ please don't use this yet! it's an experimental framework for my own personal re
 - ````clang ../src/cg_app.c -std=c89 -pedantic -Werror `pkg-config --cflags --libs --static glfw3 glew x11 xxf86vm` -o cgim && ./cgim````
 - recommended to use formatter-astyle atom package
   - allman brackets
-  - 3 indent, spaces
   - all unchecked except keep one line blocks and keep one line statements
+
+### debugging instructions
+- add ````-g```` flag to clang command above
+- install atom package "dbg-gdb"
+- press ````F9```` somewhere in code
+- right click build/cgim in atom, and ````Debug>Build```` with GDB
