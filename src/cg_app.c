@@ -162,32 +162,18 @@ int main()
 	 /* mini image test */
 	{
 		struct cg_image* im = NULL;
+      struct cg_image* src = NULL;
 		struct cg_image* dst = NULL;
 		int i=0;
-		float *data = NULL;
       clock_t start;
       clock_t end;
       double times;
+      int n = 3;
 
-		im = cg_image_load("../data/lena2D.png");
-	   cg_image_rgb_to_gray(im);
-		dst = cg_image_clone(im, 4);
-		cg_image_normalise(dst);
+      im =    cg_image_load("../data/lena2D.png");
 
-      for (i=0; i<1; i++)
-      {
-         start = clock();
-         cg_image_blur_gauss_2d(dst, 32, 2);
-         end = clock();
-         times += ((end-start)/(double)CLOCKS_PER_SEC)*1000.0;
-      }
-      times /= 1;
+		tex = nk_image_id(cg_image_bind(im));
 
-      printf("Mean Gauss Time: %f\n", times);
-
-		tex = nk_image_id(cg_image_bind(dst));
-	   cg_image_free(im);
-		cg_image_free(dst);
 	}
 
    glfwShowWindow(win);

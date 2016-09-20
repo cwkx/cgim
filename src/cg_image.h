@@ -21,10 +21,13 @@ extern "C" {
 struct cg_image;
 CG_API struct cg_image*  cg_image_load           (char const *filename);
 CG_API void              cg_image_free           (struct cg_image *im);
+CG_API unsigned int      cg_image_elems          (struct cg_image *im);
 CG_API struct cg_image*  cg_image_clone          (struct cg_image *im, int bypp);
 CG_API void              cg_image_rgb_to_gray    (struct cg_image *im);
 CG_API void              cg_image_normalise      (struct cg_image *im);
-CG_API void              cg_image_blur_gauss_2d  (struct cg_image *im, float sigma, int n);
+CG_API void              cg_image_gaussian_blur  (struct cg_image *im, float sigma);
+CG_API float*            cg_image_gaussian_kernel(float sigma, unsigned int size);
+CG_API unsigned int      cg_image_gaussian_size  (float sigma);
 /* END OF API ================================================================*/
 
 #ifdef __cplusplus
@@ -37,12 +40,19 @@ CG_API void              cg_image_blur_gauss_2d  (struct cg_image *im, float sig
 /* IMPLEMENTATION ============================================================*/
 struct cg_image
 {
-   void *data; /* can be u_bytes, u_shorts, floats or doubles  */
-   unsigned int  *size; /* size of each dimension, [w][h][d] */
-   unsigned char  dims; /* number of dimensions, e.g. 2 for 2d */
-   unsigned char  comp; /* number of components, e.g. 3 for rgb image */
+   void *data;          /* can be u_bytes, u_shorts, floats or doubles  */
+   unsigned int  *size; /* size of each dimension, [d][h][w][c] */
+   unsigned char  dims; /* number of dimensions, e.g. 3 for 2d as channel is a dimension */
    unsigned char  bypp; /* number of bytes per pixel, e.g. 1, 2, 4, or 8 */
 };
+
+CG_API unsigned int cg_image_elems(struct cg_image *im)
+{
+   unsigned int elms = 1, i=0;
+   for (i=0; i<im->dims; ++i)
+      elms *= im->size[i];
+   return elms;
+}
 
 CG_API struct cg_image* cg_image_load(char const *filename)
 {
@@ -50,21 +60,19 @@ CG_API struct cg_image* cg_image_load(char const *filename)
    struct cg_image *im = (struct cg_image*)malloc(sizeof(struct cg_image));
 
    im->bypp = 1; /* stb supports formats of unsigned char */
-   im->dims = 2; /* stb supports 2d image formats */
+   im->dims = 3; /* stb supports 2d image formats */
    im->size = malloc(im->dims * sizeof(unsigned int));
    im->data = stbi_load(filename, &width, &height, &comp, 0);
+
    im->size[0] = width;
    im->size[1] = height;
-   im->comp = comp;
+   im->size[2] = comp;
 
    return im;
 }
 
 CG_API void cg_image_free(struct cg_image *im)
 {
-   im->bypp = 0;
-   im->dims = 0;
-   im->comp = 0;
    free(im->data);
    free(im->size);
    free(im);
@@ -80,14 +88,10 @@ CG_API struct cg_image* cg_image_clone(struct cg_image *im, int bypp)
 
    out = malloc(sizeof(struct cg_image));
    out->dims = im->dims;
-   out->comp = im->comp;
    out->bypp = bypp;
 	out->size = malloc(im->dims * sizeof(unsigned int));
    memcpy(out->size, im->size, im->dims * sizeof(unsigned int));
-
-	elms = im->comp;
-   for (i=0; i<im->dims; ++i)
-      elms *= im->size[i];
+   elms = cg_image_elems(im);
 
 	/* copy from a source type into a destination type */
 	#define CG_IMAGE_CLONE(from,to) from *id = (from *)im->data; to *cd = NULL; \
@@ -131,10 +135,8 @@ CG_API struct cg_image* cg_image_clone(struct cg_image *im, int bypp)
 CG_API void cg_image_rgb_to_gray(struct cg_image *im)
 {
    unsigned int i=0, ptr=0, elms=1;
-   assert(im->comp == 3);
-
-   for (i=0; i<im->dims; ++i)
-      elms *= im->size[i];
+   assert(im->size[im->dims-1] == 3);
+   elms = cg_image_elems(im);
 
 	#define CG_IMAGE_RGB_TO_GRAY(type) type *data = (type*)im->data; \
 		for (i=0; i<elms; ++i) \
@@ -144,7 +146,7 @@ CG_API void cg_image_rgb_to_gray(struct cg_image *im)
 			type b = data[ptr++]; \
 			data[i] = 0.2126 * r + 0.7152 * g + 0.0722 * b; \
 		} \
-		data = realloc(im->data, sizeof(type)*elms);
+		im->data = (type*)realloc(im->data, sizeof(type)*elms);
 
    if 	  (im->bypp == 1) { CG_IMAGE_RGB_TO_GRAY(unsigned char); }
    else if (im->bypp == 4) { CG_IMAGE_RGB_TO_GRAY(float); }
@@ -152,18 +154,13 @@ CG_API void cg_image_rgb_to_gray(struct cg_image *im)
    else if (im->bypp == 2) { CG_IMAGE_RGB_TO_GRAY(unsigned short); }
 
 	#undef CG_IMAGE_RGB_TO_GRAY
-
-   im->comp = 1;
 }
 
 CG_API void cg_image_normalise(struct cg_image *im)
 {
 	unsigned int i=0, elms=1;
 	double dmax = DBL_MIN, dmin = DBL_MAX;
-
-	elms = im->comp;
-	for (i=0; i<im->dims; ++i)
-		elms *= im->size[i];
+	elms = cg_image_elems(im);
 
 	#define CG_IMAGE_NORMALISE(type,upper) \
 	{ \
@@ -185,106 +182,138 @@ CG_API void cg_image_normalise(struct cg_image *im)
 	#undef CG_IMAGE_NORMALISE
 }
 
-void gaussianiir2d(float *image, size_t width, size_t height, float sigma, int numsteps)
+CG_API float* cg_image_gaussian_kernel(float sigma, unsigned int ksize)
 {
-    const size_t numpixels = width*height;
-    double lambda, dnu;
-    float nu, boundaryscale, postscale;
-    float *ptr;
-    size_t i, x, y;
-    int step;
+   int i, centre; /* must not be unsigned! */
+   float sum, *kernel = NULL;
 
-    if(sigma <= 0 || numsteps < 0)
-        return;
+   assert(sigma > 0.0f);
+   assert(ksize > 0);
 
-    lambda = (sigma*sigma)/(2.0*numsteps);
-    dnu = (1.0 + 2.0*lambda - sqrt(1.0 + 4.0*lambda))/(2.0*lambda);
-    nu = (float)dnu;
-    boundaryscale = (float)(1.0/(1.0 - dnu));
-    postscale = (float)(pow(dnu/lambda,2*numsteps));
+   sum = 0.0f, centre = ksize/2;
+   kernel = (float*)malloc(sizeof(float)*ksize);
 
-    /* Filter horizontally along each row */
-    for(y = 0; y < height; y++)
-    {
-        for(step = 0; step < numsteps; step++)
-        {
-            ptr = image + width*y;
-            ptr[0] *= boundaryscale;
+   for (i=0; i<ksize; ++i) {
+      kernel[i] = exp(-(i-centre)*(i-centre) / (2.0 * sigma*sigma));
+      sum += kernel[i];
+   }
 
-            /* Filter rightwards */
-            for(x = 1; x < width; x++)
-                ptr[x] += nu*ptr[x - 1];
+   for (i=0; i<ksize; ++i)
+      kernel[i] /= sum;
 
-            ptr[x = width - 1] *= boundaryscale;
-
-            /* Filter leftwards */
-            for(; x > 0; x--)
-                ptr[x - 1] += nu*ptr[x];
-        }
-    }
-
-    /* Filter vertically along each column */
-    for(x = 0; x < width; x++)
-    {
-        for(step = 0; step < numsteps; step++)
-        {
-            ptr = image + x;
-            ptr[0] *= boundaryscale;
-
-            /* Filter downwards */
-            for(i = width; i < numpixels; i += width)
-                ptr[i] += nu*ptr[i - width];
-
-            ptr[i = numpixels - width] *= boundaryscale;
-
-            /* Filter upwards */
-            for(; i > 0; i -= width)
-                ptr[i - width] += nu*ptr[i];
-        }
-    }
-
-    for(i = 0; i < numpixels; i++)
-        image[i] *= postscale;
-
-    return;
+   return kernel;
 }
 
-
-CG_API void cg_image_blur_gauss_2d(struct cg_image *im, float sigma, int n)
+CG_API unsigned int cg_image_gaussian_size(float sigma)
 {
-   float *data = (float*)im->data;
-   size_t width = (size_t)im->size[0];
-   size_t height = (size_t)im->size[1];
-   gaussianiir2d(data, width, height, sigma, n);
+   unsigned int size = (4*sigma+1);
+   if (size%2 == 0)
+      size++;
+   return size;
 }
 
-CG_API void cg_image_blur_box_2d(const struct cg_image *src, struct cg_image *dst, const unsigned int* boxes, const int n)
+CG_API unsigned int cg_image_sub2ind(unsigned int* zyxc, unsigned int* size, unsigned int dims)
 {
-   /* todo: profile against: http://blog.ivank.net/fastest-gaussian-blur.html */
+   unsigned int pos = zyxc[0], i;
+   for (i=1; i<dims; ++i)
+      pos = (pos * size[i]) + zyxc[i];
+   return pos;
 }
 
-CG_API unsigned int* cg_image_blur_boxes(const double sigma, const int n)
+CG_API void cg_image_gaussian_blur(struct cg_image *ia, float sigma)
 {
-   unsigned int wl, wu, m;
-   unsigned int* sizes = NULL;
-   int i;
+   unsigned int ksize = 0, i=0, d;
+   float *kernel = NULL;
+   struct cg_image *ib = NULL;
+   float *a = NULL, *b = NULL;
 
-   wl = floor(sqrt((12*sigma*sigma/n)+1));
-   if(wl%2==0)
-      wl--;
+   ksize = cg_image_gaussian_size(sigma);
+   kernel = cg_image_gaussian_kernel(sigma, ksize);
+   ib = cg_image_clone(ia, 4);
+   a = (float*)ia->data;
+   b = (float*)ib->data;
 
-   wu = wl+2;
-   m  = (int)((12*sigma*sigma - n*wl*wl - 4*n*wl - 3*n)/(-4*wl - 4) + 0.5);
-   sizes = malloc(sizeof(unsigned int)*n);
+   for (d=1; d<ia->dims; ++d)
+   {
+      a[i] *= 0.99;
+   }
 
-   for (i=0; i<n; ++i)
-      if (i<m)
-         sizes[i]=wl;
-      else
-         sizes[i]=wu;
-
-   return sizes;
+   free(ib);
+   free(kernel);
 }
+
+/* Alvarez, Mazorra, “Signal and Image Restoration using Shock Filters and Anisotropic Diffusion,” SIAM J. on Numerical Analysis, vol. 31, no. 2, pp. 590–605, 1994.
+CG_API void cg_image_blur_gauss_2d(struct cg_image *im, float sigma, int numsteps)
+{
+   double         lambda, dnu;
+   float          nu, boundaryscale, postscale, *ptr, *data;
+   unsigned int   i, x, y, elms, width, height;
+   int            step;
+
+   assert(sigma>0 && numsteps>0);
+   assert(im->dims == 2);
+   assert(im->comp == 1);
+
+   width = im->size[0];
+   height = im->size[1];
+   data = (float*)im->data;
+
+	elms = im->comp;
+	for (i=0; i<im->dims; ++i)
+		elms *= im->size[i];
+
+   lambda = (sigma*sigma)/(2.0*numsteps);
+   dnu = (1.0 + 2.0*lambda - sqrt(1.0 + 4.0*lambda))/(2.0*lambda);
+   nu = (float)dnu;
+   boundaryscale = (float)(1.0/(1.0 - dnu));
+   postscale = (float)(pow(dnu/lambda,2*numsteps));
+
+   for (y=0; y<height; ++y)
+   {
+      for(step = 0; step<numsteps; ++step)
+      {
+           ptr = data+width*y;
+           ptr[0] *= boundaryscale;
+
+
+           for(x=1; x<width; x++) {
+               ptr[x] += nu*ptr[x-1];
+            }
+
+           ptr[x=width-1] *= boundaryscale;
+
+
+           for(; x>0; x--)
+               ptr[x-1] += nu*ptr[x];
+      }
+   }
+
+   for(x = 0; x < width; ++x)
+   {
+      for(step = 0; step<numsteps; ++step)
+      {
+           ptr = data + x;
+           ptr[0] *= boundaryscale;
+
+
+           for(i=width; i<elms; i+=width)
+               ptr[i] += nu*ptr[i-width];
+
+           ptr[i=elms-width] *= boundaryscale;
+
+
+           for(; i>0; i-=width)
+               ptr[i - width] += nu*ptr[i];
+      }
+   }
+
+   for(i = 0; i < elms; ++i)
+      data[i] *= postscale;
+
+   return;
+}
+ */
+
 /* END OF IMPLEMENTATION =====================================================*/
 
 #endif
