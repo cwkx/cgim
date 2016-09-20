@@ -62,9 +62,6 @@ CG_API struct cg_image* cg_image_load(char const *filename)
 
 CG_API void cg_image_free(struct cg_image *im)
 {
-   im->bypp = 0;
-   im->dims = 0;
-   im->comp = 0;
    free(im->data);
    free(im->size);
    free(im);
@@ -144,7 +141,7 @@ CG_API void cg_image_rgb_to_gray(struct cg_image *im)
 			type b = data[ptr++]; \
 			data[i] = 0.2126 * r + 0.7152 * g + 0.0722 * b; \
 		} \
-		data = realloc(im->data, sizeof(type)*elms);
+		im->data = (type*)realloc(im->data, sizeof(type)*elms);
 
    if 	  (im->bypp == 1) { CG_IMAGE_RGB_TO_GRAY(unsigned char); }
    else if (im->bypp == 4) { CG_IMAGE_RGB_TO_GRAY(float); }
@@ -258,9 +255,14 @@ CG_API void cg_image_blur_gauss_2d(struct cg_image *im, float sigma, int n)
    gaussianiir2d(data, width, height, sigma, n);
 }
 
+CG_API void cg_image_box_blur(const struct cg_image *src, struct cg_image *dst, int r)
+{
+   memcpy(dst->data, src->data, sizeof(src->data));
+}
+
 CG_API void cg_image_blur_box_2d(const struct cg_image *src, struct cg_image *dst, const unsigned int* boxes, const int n)
 {
-   /* todo: w */
+
 }
 
 CG_API unsigned int* cg_image_blur_boxes(const double sigma, const int n)

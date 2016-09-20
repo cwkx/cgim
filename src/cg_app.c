@@ -164,7 +164,6 @@ int main()
 		struct cg_image* im = NULL;
 		struct cg_image* dst = NULL;
 		int i=0;
-		float *data = NULL;
       clock_t start;
       clock_t end;
       double times;
@@ -177,7 +176,7 @@ int main()
       for (i=0; i<1; i++)
       {
          start = clock();
-         cg_image_blur_gauss_2d(dst, 32, 2);
+         cg_image_blur_gauss_2d(dst, 2, 2);
          end = clock();
          times += ((end-start)/(double)CLOCKS_PER_SEC)*1000.0;
       }
