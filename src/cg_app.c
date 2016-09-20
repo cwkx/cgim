@@ -35,6 +35,7 @@
 #include "nk_nuklear.h"
 #include "nk_glfw3.h"
 #include "stb_image.h"
+#include "cg_tensor.h"
 #include "cg_image.h"
 #include "cg_image_gl.h"
 
