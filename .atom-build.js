@@ -1,7 +1,7 @@
 // main commands for atom-build, currently only tested on linux
 var cmdPre = "cd build && ";
-var cmdBuild = "gcc ../src/cg_app.c ";
-var cmdFlags = "-std=c89 -pedantic -Werror -fsanitize=address ";
+var cmdBuild = "clang ../src/cg_app.c ";
+var cmdFlags = "-std=c89 -pedantic -Werror "; // -fsanitize=address
 var cmdLibs = "`pkg-config --cflags --libs --static glfw3 glew x11 xxf86vm` ";
 var cmdOut = "-o cgim";
 
