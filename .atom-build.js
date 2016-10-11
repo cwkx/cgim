@@ -32,6 +32,16 @@ module.exports = {
             "gdb --batch -ex \"set disassembly-flavor intel\" -ex \"disas /s {SELECTION}\" cgim > out.asm",
          keymap: "f7",
          atomCommandName: "CGIM:view assembly"
-      }
+      },
+      "Build Preprocessor": {
+         cmd: "cd build && clang ../prc/cg_prc.c " + cmdFlags + " -o prc",
+         keymap: "f10",
+         atomCommandName: "CGIM:build preprocessor"
+      },
+      "Preprocess": {
+         cmd: "cd build && ./prc",
+         keymap: "f8",
+         atomCommandName: "CGIM:preprocess"
+      },
    }
 };
