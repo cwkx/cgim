@@ -3,16 +3,19 @@
    copyright chris g. willcocks MIT license
 ==============================================================================*/
 
-template<T>
-struct cg_tensor_T
+struct vec2f
+{
+	float x,y;
+};
+
+T struct cg_tensor_T
 {
 	T *data;
 	unsigned int *size;
 	unsigned char n;
 };
 
-template<T>
-uint32 cg_tensor_T_elems(struct cg_tensor_T *t)
+T={unsigned int,float} uint32 cg_tensor_T_elems(struct cg_tensor_T *t)
 {
    uint32 i;
    uint32 elms=1;
@@ -23,16 +26,14 @@ uint32 cg_tensor_T_elems(struct cg_tensor_T *t)
    return elms;
 }
 
-template<T>
-void cg_tensor_T_free(struct cg_tensor_T *t)
+T void cg_tensor_T_free(struct cg_tensor_T *t)
 {
    free(t->data);
    free(t->size);
    free(t);
 }
 
-template<T1,T2>
-struct cg_tensor_T2* void cg_tensor_T1_to_T2(const struct cg_tensor_T1 *t1)
+T1,T2 struct cg_tensor_T2* void cg_tensor_T1_to_T2(const struct cg_tensor_T1 *t1)
 {
    T2 *t2 = NULL;
    uint32 elms, i;
